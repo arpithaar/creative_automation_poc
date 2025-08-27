@@ -118,7 +118,7 @@ campaign:
 npm start
 ```
 
-**Note**: The main script now uses an optimized **hybrid approach** that combines parallel processing with selective sequencing for maximum speed and reliability.
+**Note**: The main script uses an optimized **hybrid approach** that combines parallel processing with selective sequencing for maximum speed and reliability.
 
 ## Project Structure
 ```
@@ -298,7 +298,7 @@ sequenceDiagram
     Note over App,S3: Results Generation
     App->>S3: getPresignedUrl(s3Key)
     S3-->>App: presignedUrl
-    App->>App: Save results to hybrid JSON + logs
+    App->>App: Save results to JSON + logs
 ```
 
 ### Hybrid Approach Benefits

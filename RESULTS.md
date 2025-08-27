@@ -84,7 +84,7 @@ Each failed processing includes:
 ## Output Files
 
 ### JSON Results File
-- **Location**: `./results-hybrid-YYYY-MM-DD_HH-MM-SS.json`
+- **Location**: `./results/results-YYYY-MM-DD_HH-MM-SS.json`
 - **Content**: Complete results object with all successes and failures
 - **Format**: Pretty-printed JSON for easy reading
 - **Processing Info**: Includes processing steps and asset type information

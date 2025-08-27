@@ -597,7 +597,13 @@ async function main() {
     String(now.getHours()).padStart(2, '0') + '-' +
     String(now.getMinutes()).padStart(2, '0') + '-' +
     String(now.getSeconds()).padStart(2, '0');
-  const resultsFile = `./results-hybrid-${timestamp}.json`;
+  // Ensure results directory exists
+  const resultsDir = './results';
+  if (!fs.existsSync(resultsDir)) {
+    fs.mkdirSync(resultsDir, { recursive: true });
+  }
+  
+  const resultsFile = `${resultsDir}/results-${timestamp}.json`;
   fs.writeFileSync(resultsFile, JSON.stringify(results, null, 2));
   logger.info("Results saved to file", { resultsFile, executionTime: `${executionTime}s` });
 
