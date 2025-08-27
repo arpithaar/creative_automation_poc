@@ -178,28 +178,28 @@ graph TB
     subgraph "Discovery & Generation"
         C[Scan Local Assets]
         D[Identify Missing Categories]
-        E[Generate Missing Assets<br/>Adobe Firefly API (Parallel)]
+        E["Generate Missing Assets<br/>Adobe Firefly API - Parallel"]
     end
     
     subgraph "Phase 1: Upload & Expand"
-        F1[Upload to Firefly (Parallel)]
-        F2[Expand Images (Parallel)]
+        F1["Upload to Firefly - Parallel"]
+        F2["Expand Images - Parallel"]
     end
     
     subgraph "Phase 2: Mask Creation"
-        G1[Create Masks<br/>Adobe Photoshop API (Sequential)]
+        G1["Create Masks<br/>Adobe Photoshop API - Sequential"]
         G2[Avoid Rate Limits]
     end
     
     subgraph "Phase 3: Fill & Text Overlay"
-        H1[Fill Background (Parallel)<br/>Adobe Firefly API]
-        H2[Add Text Overlay (Parallel)<br/>Sharp Library]
-        H3[Upload to S3 (Parallel)]
+        H1["Fill Background - Parallel<br/>Adobe Firefly API"]
+        H2["Add Text Overlay - Parallel<br/>Sharp Library"]
+        H3["Upload to S3 - Parallel"]
     end
     
     subgraph "Generated Asset Fast Track"
-        I1[Skip to Text Overlay (Parallel)<br/>Sharp Library]
-        I2[Upload to S3 (Parallel)]
+        I1["Skip to Text Overlay - Parallel<br/>Sharp Library"]
+        I2["Upload to S3 - Parallel"]
     end
     
     subgraph "Output & Results"
