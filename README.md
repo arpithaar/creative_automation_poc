@@ -29,6 +29,8 @@ Proof of concept for automated creative asset localization using Adobe Firefly A
 
 ### ☁️ **Cloud Integration**
 - **AWS S3**: Automated storage with organized folder structure
+
+### 🤖 **Gen AI**
 - **Adobe Firefly**: AI image generation and manipulation
 - **Adobe Photoshop**: Advanced masking and compositing
 
@@ -156,8 +158,9 @@ s3://bucket/creative_automation_poc/
 ### Asset Types
 - **Local Assets**: Existing images processed through full pipeline (expand → mask → fill → text overlay)
   - Processed for all configured aspect ratios
-  - Can be any initial size or format
-- **Generated Assets**: AI-created images for missing categories (text overlay only)
+  - Supported formats: PNG, JPEG, WebP
+  - Can be any initial size (automatically resized)
+- **Generated Assets**: AI-created images for missing categories
   - Generated at Firefly-optimized dimensions for each aspect ratio
   - Only processed for their specific aspect ratio to maintain quality
   - Skip expand/mask/fill pipeline for efficiency
