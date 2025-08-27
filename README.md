@@ -126,7 +126,7 @@ creative_automation_poc/
 ├── assets/
 │   └── products/          # Source images by category
 ├── logs/                  # Application logs
-├── results-hybrid-YYYY-MM-DD.json # Processing results
+├── results/               # Generated results files
 ├── index.js              # Main application (hybrid approach)
 ├── firefly-utils.js       # Adobe API utilities
 ├── S3Client.js           # AWS S3 integration
