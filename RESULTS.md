@@ -1,7 +1,7 @@
 # Results Tracking
 
 ## Overview
-The Creative Automation POC now tracks all processing results, including successes and failures, with detailed information for each generated image.
+The Creative Automation POC tracks all processing results using an optimized **hybrid approach** that combines parallel processing with selective sequencing. Results include detailed information for each generated image with processing step tracking.
 
 ## Results Object Structure
 
@@ -46,7 +46,7 @@ Each successful image generation includes:
 ```
 
 ### Generated Asset Entries
-AI-generated assets have additional fields:
+AI-generated assets have optimized processing:
 ```json
 {
   "assetName": "shoes_generated_1x1.jpg",
@@ -58,7 +58,7 @@ AI-generated assets have additional fields:
   "presignedGetUrl": "https://acspocbucket.s3.us-east-1.amazonaws.com/...",
   "dimensions": { "width": 2048, "height": 2048 },
   "message": "Step Into Your Power",
-  "assetType": "s3",
+  "assetType": "generated",
   "isGenerated": true,
   "processingSteps": ["text_overlay"],
   "timestamp": "2025-08-27T18:24:52.639Z"
@@ -84,9 +84,10 @@ Each failed processing includes:
 ## Output Files
 
 ### JSON Results File
-- **Location**: `./results-YYYY-MM-DD.json`
+- **Location**: `./results-hybrid-YYYY-MM-DD_HH-MM-SS.json`
 - **Content**: Complete results object with all successes and failures
 - **Format**: Pretty-printed JSON for easy reading
+- **Processing Info**: Includes processing steps and asset type information
 
 ### Logs
 - **Success logs**: Written to main log file with `logger.info()`

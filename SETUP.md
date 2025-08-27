@@ -13,7 +13,7 @@ Create a `.env` file with the following variables:
 # Get these from Adobe Developer Console (https://developer.adobe.com/console)
 ADOBE_CLIENT_ID=your_adobe_client_id_here
 ADOBE_CLIENT_SECRET=your_adobe_client_secret_here
-ADOBE_SCOPES=openid,AdobeID,firefly_api,ff_apis
+ADOBE_SCOPES=openid,AdobeID,session,additional_info,read_organizations,firefly_api,ff_apis
 
 # AWS S3 Configuration (Required)
 # Used for storing generated assets and intermediate files
@@ -83,6 +83,11 @@ The authentication is handled automatically when you run the script:
 ```bash
 npm start
 ```
+
+**Note**: The main script now uses an optimized **hybrid approach**:
+- **Parallel processing** for Firefly APIs (fast)
+- **Sequential processing** for Photoshop API (avoids rate limits)
+- **Best performance** with maximum reliability
 
 The console will show authentication status:
 - `✅ Successfully generated Adobe access token`

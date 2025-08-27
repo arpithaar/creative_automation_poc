@@ -1,3 +1,9 @@
+// Creative Automation POC - Main Processing Script
+// HYBRID APPROACH: Optimized parallel processing with selective sequencing
+// - Firefly APIs: Parallel (they handle concurrency well)
+// - Photoshop API: Sequential (to avoid rate limits)
+// - Text Overlay: Parallel (local processing)
+// - Best of both worlds: Speed + Reliability
 
 import 'dotenv/config';
 import fs from 'node:fs';
@@ -30,7 +36,6 @@ if (!ADOBE_CLIENT_ID || !ADOBE_CLIENT_SECRET || !ADOBE_SCOPES) {
   process.exit(1);
 }
 
-// Check for S3 configuration
 if (!AWS_REGION || !S3_BUCKET_NAME || !AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !S3_KEY_PREFIX) {
   console.error('Missing required S3 environment variables:');
   console.error('- AWS_REGION');
@@ -43,27 +48,27 @@ if (!AWS_REGION || !S3_BUCKET_NAME || !AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_K
 
 const ratioToSize = (ratio) => {
   switch (ratio) {
-    case '1:1': return { width: 2048, height: 2048 }; // Perfect 1:1 square
-    case '9:16': return { width: 1792, height: 2304 }; // Portrait format (1792:2304 ≈ 9:16)
-    case '16:9': return { width: 2688, height: 1512 }; // Perfect 16:9 landscape
+    case '1:1': return { width: 2048, height: 2048 };
+    case '9:16': return { width: 1792, height: 2304 };
+    case '16:9': return { width: 2688, height: 1512 };
     default: return { width: 2048, height: 2048 };
   }
 };
 
-
-// Helper function to generate missing assets using Firefly
-async function generateMissingAssets(firefly, s3Client, brief, missingCategories) {
-  logger.info("generateMissingAssets: Starting asset generation", { missingCategories });
+// PARALLELIZED: Generate missing assets with Promise.all (Firefly handles this well)
+async function generateMissingAssetsParallel(firefly, s3Client, brief, missingCategories) {
+  logger.info("generateMissingAssets: Starting parallel asset generation", { missingCategories });
   
   const generatedAssets = [];
   
-  // Early return if no missing categories
   if (missingCategories.length === 0) {
     logger.info("generateMissingAssets: No missing categories, skipping generation");
     return generatedAssets;
   }
   
-  // Generate assets only for missing categories
+  // Create all generation tasks in parallel
+  const generationTasks = [];
+  
   for (const categoryName of missingCategories) {
     const categoryConfig = brief.product_categories[categoryName];
     if (!categoryConfig) {
@@ -73,95 +78,397 @@ async function generateMissingAssets(firefly, s3Client, brief, missingCategories
     
     logger.info("generateMissingAssets: Generating images for missing category", { category: categoryName });
     
-    // Generate for each aspect ratio directly
+    // Generate all aspect ratios for this category in parallel
     for (const ratio of brief.aspect_ratios) {
       const { width, height } = ratioToSize(ratio);
-      
-      // Create enhanced prompt that includes background for the category and regions
       const enhancedPrompt = getEnhancedProductPrompt(categoryName, categoryConfig, ratio, brief);
       
-      try {
-        const generateResult = await generateImage(firefly, enhancedPrompt, width, height, 1, 'en-US');
-        const generatedImageUrl = generateResult.outputs[0].image.url;
-        
-        // Use generated image URL directly, no intermediate S3 storage needed
-        const aspectRatioFormatted = ratio.replace(':', 'x');
-        const filename = `${categoryName}_generated_${aspectRatioFormatted}.jpg`;
-        
-        generatedAssets.push({
-          category: categoryName,
-          aspectRatio: ratio,
-          downloadUrl: generatedImageUrl,
-          filename: filename,
-          prompt: enhancedPrompt,
-          isGenerated: true,
-          dimensions: { width, height }
-        });
-        
-        logger.info("generateMissingAssets: Generated asset ready for processing", { 
-          category: categoryName,
-          aspectRatio: ratio,
-          filename: filename,
-          imageUrl: generatedImageUrl.substring(0, 100) + "..."
-        });
-        
-      } catch (error) {
-        logger.error("generateMissingAssets: Failed to generate asset", { 
-          category: categoryName,
-          aspectRatio: ratio, 
-          error: error.message 
-        });
-        throw error;
-      }
+      const task = generateSingleAsset(firefly, enhancedPrompt, width, height, categoryName, ratio);
+      generationTasks.push(task);
     }
   }
   
-  logger.info("generateMissingAssets: Asset generation completed", { 
+  // Execute all generation tasks in parallel
+  try {
+    const results = await Promise.allSettled(generationTasks);
+    
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value) {
+        generatedAssets.push(result.value);
+        logger.info("generateMissingAssets: Generated asset ready for processing", result.value);
+      } else {
+        logger.error("generateMissingAssets: Failed to generate asset", { 
+          error: result.reason?.message || 'Unknown error',
+          taskIndex: index
+        });
+      }
+    });
+    
+  } catch (error) {
+    logger.error("generateMissingAssets: Parallel generation failed", error);
+    throw error;
+  }
+  
+  logger.info("generateMissingAssets: Parallel asset generation completed", { 
     generated: generatedAssets.length,
-    assets: generatedAssets
+    total: generationTasks.length
   });
   
   return generatedAssets;
 }
 
-// Helper function to create base product prompts
+// Helper function for single asset generation
+async function generateSingleAsset(firefly, enhancedPrompt, width, height, categoryName, ratio) {
+  try {
+    const generateResult = await generateImage(firefly, enhancedPrompt, width, height, 1, 'en-US');
+    const generatedImageUrl = generateResult.outputs[0].image.url;
+    
+    const aspectRatioFormatted = ratio.replace(':', 'x');
+    const filename = `${categoryName}_generated_${aspectRatioFormatted}.jpg`;
+    
+    return {
+      category: categoryName,
+      aspectRatio: ratio,
+      downloadUrl: generatedImageUrl,
+      filename: filename,
+      prompt: enhancedPrompt,
+      isGenerated: true,
+      dimensions: { width, height }
+    };
+  } catch (error) {
+    logger.error("generateSingleAsset: Failed", { 
+      category: categoryName,
+      aspectRatio: ratio, 
+      error: error.message 
+    });
+    throw error;
+  }
+}
+
+// HYBRID: Process assets with selective parallelization
+async function processAssetsHybrid(assetReferences, brief, firefly, photoshop, s3Client) {
+  logger.info("Starting HYBRID asset processing", { totalAssets: assetReferences.length });
+  
+  // Phase 1: Parallel Upload & Expand (Firefly handles this well)
+  logger.info("Phase 1: Parallel Upload & Expand operations");
+  const preparedAssets = await parallelUploadAndExpand(assetReferences, brief, firefly);
+  
+  // Phase 2: Sequential Mask Creation (Photoshop rate limit bottleneck)
+  logger.info("Phase 2: Sequential Mask creation (avoiding rate limits)");
+  const maskedAssets = await sequentialMaskCreation(preparedAssets, photoshop, s3Client);
+  
+  // Phase 3: Parallel Fill & Text Overlay (Fast operations)
+  logger.info("Phase 3: Parallel Fill & Text overlay");
+  const results = await parallelFillAndOverlay(maskedAssets, brief, firefly, s3Client);
+  
+  return results;
+}
+
+// Phase 1: Parallel Upload & Expand
+async function parallelUploadAndExpand(assetReferences, brief, firefly) {
+  const uploadExpandTasks = [];
+  
+  for (const assetRef of assetReferences) {
+    const productCategoryConfig = brief.product_categories[assetRef.category];
+    if (!productCategoryConfig) continue;
+    
+    // Load asset buffer once (for local assets)
+    let baseBuffer;
+    let assetName;
+    
+    try {
+      if (assetRef.type === 'local') {
+        if (!fs.existsSync(assetRef.path)) {
+          throw new Error("Local image file not found");
+        }
+        baseBuffer = fs.readFileSync(assetRef.path);
+        assetName = path.basename(assetRef.path);
+      } else if (assetRef.type === 'generated') {
+        assetName = assetRef.filename;
+        baseBuffer = Buffer.alloc(0);
+      }
+      
+      if (assetRef.type === 'local' && baseBuffer.length === 0) {
+        throw new Error("Empty image buffer");
+      }
+    } catch (error) {
+      logger.error(`Failed to load asset: ${assetRef.filename}`, error);
+      continue;
+    }
+    
+    // Create tasks for all region/ratio combinations
+    for (const region of productCategoryConfig.target_regions) {
+      for (const ratio of brief.aspect_ratios) {
+        // Skip if generated asset doesn't match ratio
+        if (assetRef.isGenerated && assetRef.aspectRatio !== ratio) {
+          continue;
+        }
+        
+        if (assetRef.isGenerated) {
+          // Generated assets skip upload/expand
+          uploadExpandTasks.push(Promise.resolve({
+            assetRef,
+            region,
+            ratio,
+            assetName,
+            imageUrl: assetRef.downloadUrl,
+            needsMask: false
+          }));
+        } else {
+          // Local assets need upload/expand
+          const task = uploadAndExpandSingle(assetRef, region, ratio, baseBuffer, assetName, firefly);
+          uploadExpandTasks.push(task);
+        }
+      }
+    }
+  }
+  
+  // Execute all upload/expand operations in parallel
+  logger.info(`Executing ${uploadExpandTasks.length} upload/expand operations in parallel`);
+  const results = await Promise.allSettled(uploadExpandTasks);
+  
+  const preparedAssets = [];
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled' && result.value) {
+      preparedAssets.push(result.value);
+    } else {
+      logger.error("Upload/Expand failed", { 
+        error: result.reason?.message || 'Unknown error',
+        taskIndex: index
+      });
+    }
+  });
+  
+  logger.info(`Phase 1 completed: ${preparedAssets.length} assets prepared`);
+  return preparedAssets;
+}
+
+// Single upload & expand operation
+async function uploadAndExpandSingle(assetRef, region, ratio, baseBuffer, assetName, firefly) {
+  try {
+    const { width, height } = ratioToSize(ratio);
+    const label = `${path.basename(assetName, path.extname(assetName))}_${region.code}_${ratio.replace(':', 'x')}`;
+    
+    logger.info("Upload & Expand", { label, targetSize: `${width}x${height}` });
+    
+    // Upload to Firefly
+    const uploadResponse = await uploadImage(firefly, baseBuffer, assetName);
+    const uploadResult = uploadResponse.data || uploadResponse.result || uploadResponse;
+    const imageId = uploadResult.images[0].id;
+    
+    // Expand image
+    const expandedImages = await expandImage(firefly, imageId, width, height, 1);
+    const expandedImageUrl = expandedImages.expandResults.outputs[0].image.url;
+    
+    return {
+      assetRef,
+      region,
+      ratio,
+      assetName,
+      imageUrl: expandedImageUrl,
+      needsMask: true,
+      label
+    };
+    
+  } catch (error) {
+    logger.error("Upload/Expand failed", { 
+      asset: assetName,
+      region: region.code,
+      ratio,
+      error: error.message 
+    });
+    throw error;
+  }
+}
+
+// Phase 2: Sequential Mask Creation (THE BOTTLENECK)
+async function sequentialMaskCreation(preparedAssets, photoshop, s3Client) {
+  logger.info(`Phase 2: Processing ${preparedAssets.length} assets sequentially for masks`);
+  
+  const maskedAssets = [];
+  
+  for (let i = 0; i < preparedAssets.length; i++) {
+    const asset = preparedAssets[i];
+    
+    logger.info(`Mask creation ${i + 1}/${preparedAssets.length}`, { 
+      label: asset.label || `${asset.assetName}_${asset.region.code}_${asset.ratio}`
+    });
+    
+    try {
+      if (asset.needsMask) {
+        // Create mask using Photoshop API (sequential)
+        const invertMaskPresignedGetUrl = await createMask(
+          s3Client, 
+          photoshop, 
+          asset.imageUrl, 
+          asset.assetName, 
+          S3_BUCKET_NAME, 
+          S3_KEY_PREFIX + "/intermediate"
+        );
+        
+        maskedAssets.push({
+          ...asset,
+          maskUrl: invertMaskPresignedGetUrl
+        });
+      } else {
+        // Generated assets don't need masks
+        maskedAssets.push({
+          ...asset,
+          maskUrl: null
+        });
+      }
+      
+      // Small delay between Photoshop API calls for stability
+      if (asset.needsMask && i < preparedAssets.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+    } catch (error) {
+      logger.error("Mask creation failed", { 
+        asset: asset.assetName,
+        error: error.message 
+      });
+      // Continue with other assets
+    }
+  }
+  
+  logger.info(`Phase 2 completed: ${maskedAssets.length} assets with masks`);
+  return maskedAssets;
+}
+
+// Phase 3: Parallel Fill & Text Overlay
+async function parallelFillAndOverlay(maskedAssets, brief, firefly, s3Client) {
+  logger.info(`Phase 3: Processing ${maskedAssets.length} assets in parallel for fill & overlay`);
+  
+  const finalTasks = maskedAssets.map(asset => 
+    processFillAndOverlay(asset, brief, firefly, s3Client)
+  );
+  
+  // Execute all fill & overlay operations in parallel
+  const results = await Promise.allSettled(finalTasks);
+  
+  // Process results
+  const processResults = {
+    success: [],
+    failures: [],
+    summary: {
+      total: maskedAssets.length,
+      processed: results.length,
+      succeeded: 0,
+      failed: 0
+    }
+  };
+  
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled' && result.value.success) {
+      processResults.success.push(result.value.data);
+      processResults.summary.succeeded++;
+    } else {
+      processResults.failures.push(result.value?.error || { error: result.reason?.message });
+      processResults.summary.failed++;
+    }
+  });
+  
+  logger.info(`Phase 3 completed: ${processResults.summary.succeeded} success, ${processResults.summary.failed} failed`);
+  return processResults;
+}
+
+// Single fill & overlay operation
+async function processFillAndOverlay(asset, brief, firefly, s3Client) {
+  try {
+    const { width, height } = ratioToSize(asset.ratio);
+    const label = asset.label || `${path.basename(asset.assetName, path.extname(asset.assetName))}_${asset.region.code}_${asset.ratio.replace(':', 'x')}`;
+    
+    let imageUrl = asset.imageUrl;
+    
+    // Fill background if needed (local assets only)
+    if (asset.needsMask && asset.maskUrl) {
+      const fillImageResults = await fillImage(
+        firefly, 
+        asset.imageUrl, 
+        asset.maskUrl, 
+        asset.region.background_prompt, 
+        1, 
+        asset.region.locale
+      );
+      imageUrl = fillImageResults.outputs[0].image.url;
+    }
+    
+    // Final processing & text overlay
+    const baseFileName = path.basename(asset.assetName, path.extname(asset.assetName));
+    const baseImageExtension = path.extname(asset.assetName);
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const aspectRatioFormatted = asset.ratio.replace(':', 'x');
+    const s3Key = `${S3_KEY_PREFIX}/${brief.id}/${asset.assetRef.category}/${asset.region.code}/${aspectRatioFormatted}/${baseFileName}_${asset.region.code}_${aspectRatioFormatted}_${timestamp}${baseImageExtension}`;
+    const textLayerPutUrl = await s3Client.getPresignedPutUrl(S3_BUCKET_NAME, s3Key, 3600);
+    
+    const imageFormat = getMimeType(baseImageExtension);
+    await addTextOverlay(imageUrl, textLayerPutUrl, asset.region.message, imageFormat, baseImageExtension);
+    
+    const finalImageGetUrl = await s3Client.getPresignedGetUrl(S3_BUCKET_NAME, s3Key, 3600);
+    
+    return {
+      success: true,
+      data: {
+        assetName: asset.assetName,
+        productCategory: asset.assetRef.category,
+        region: asset.region.code,
+        aspectRatio: asset.ratio,
+        label,
+        s3Key,
+        presignedGetUrl: finalImageGetUrl,
+        dimensions: { width, height },
+        message: asset.region.message,
+        assetType: asset.assetRef.type,
+        isGenerated: asset.assetRef.isGenerated,
+        processingSteps: asset.assetRef.isGenerated ? ['text_overlay'] : ['upload', 'expand', 'mask', 'fill', 'text_overlay'],
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+  } catch (error) {
+    logger.error(`Fill & overlay failed`, { error: error.message });
+    return {
+      success: false,
+      error: {
+        assetName: asset.assetName,
+        productCategory: asset.assetRef.category,
+        region: asset.region.code,
+        aspectRatio: asset.ratio,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+}
+
+// Helper functions (unchanged from original)
 function getBaseProductPrompt(category, brief) {
   const prompts = brief.product_prompts || {};
-  
   return prompts[category] || `A premium ${category} product, modern design, clean style on white background, studio lighting, product photography style, high quality, commercial photography`;
 }
 
-// Helper function to create enhanced prompts with background for generated assets
 function getEnhancedProductPrompt(category, categoryConfig, aspectRatio, brief) {
   const basePrompt = getBaseProductPrompt(category, brief);
-  
-  // Get a representative background prompt from the first region
   const backgroundPrompt = categoryConfig.target_regions[0]?.background_prompt || '';
-  
-  // Combine product and background for a complete scene
   const enhancedPrompt = `${basePrompt}, set in ${backgroundPrompt}, professional commercial photography, high quality, detailed`;
-  
   return enhancedPrompt;
 }
 
-// Helper function to get asset references (local files + S3 generated assets)
 async function getAssetReferences(assetsFolder, firefly, s3Client, brief) {
   const assetReferences = [];
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
 
-  // First, scan for existing local assets
+  // Scan for existing local assets
   if (fs.existsSync(assetsFolder)) {
     function scanDirectory(dir) {
       const items = fs.readdirSync(dir, { withFileTypes: true });
-
       for (const item of items) {
         const fullPath = path.join(dir, item.name);
-
         if (item.isDirectory()) {
-          // Recursively scan subdirectories
           scanDirectory(fullPath);
         } else if (item.isFile()) {
-          // Check if it's an image file
           const ext = path.extname(item.name).toLowerCase();
           if (imageExtensions.includes(ext)) {
             const productCategory = path.basename(path.dirname(fullPath));
@@ -176,7 +483,6 @@ async function getAssetReferences(assetsFolder, firefly, s3Client, brief) {
         }
       }
     }
-
     scanDirectory(assetsFolder);
     logger.info(`Found ${assetReferences.length} local asset(s)`, { 
       files: assetReferences.map(a => a.filename) 
@@ -189,16 +495,15 @@ async function getAssetReferences(assetsFolder, firefly, s3Client, brief) {
     category => !categoriesWithAssets.has(category)
   );
 
-  // Generate missing assets for categories without local assets
+  // Generate missing assets in parallel
   if (missingCategories.length > 0) {
-    logger.info("Missing categories detected, generating assets", { 
+    logger.info("Missing categories detected, generating assets in parallel", { 
       missingCategories,
       totalCategories: Object.keys(brief.product_categories).length
     });
     
-    const generatedAssets = await generateMissingAssets(firefly, s3Client, brief, missingCategories);
+    const generatedAssets = await generateMissingAssetsParallel(firefly, s3Client, brief, missingCategories);
     
-    // Add generated assets to references, but only for missing categories
     for (const generatedAsset of generatedAssets) {
       if (missingCategories.includes(generatedAsset.category)) {
         assetReferences.push({
@@ -227,34 +532,36 @@ async function getAssetReferences(assetsFolder, firefly, s3Client, brief) {
   return assetReferences;
 }
 
+async function downloadImage(imageUrl) {
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+    }
+    return await response.arrayBuffer();
+  } catch (error) {
+    console.error(`Error downloading image from ${imageUrl}:`, error.message);
+    throw error;
+  }
+}
+
 const readYaml = (p) => YAML.parse(fs.readFileSync(p, 'utf-8'));
 
-
 async function main() {
+  const startTime = Date.now();
   const brief = readYaml('./campaign.yaml').campaign;
   const assetsFolder = brief.assets_folder;
 
-  // Initialize results tracking
-  const results = {
-    success: [],
-    failures: [],
-    summary: {
-      total: 0,
-      processed: 0,
-      succeeded: 0,
-      failed: 0
-    }
-  };
+  logger.info("🚀 HYBRID Processing: Parallel + Sequential optimization");
 
-  // Initialize Adobe authentication first (needed for asset generation)
+  // Initialize Adobe authentication
   const authProvider = new ServerToServerTokenProvider({
     clientId: ADOBE_CLIENT_ID,
     clientSecret: ADOBE_CLIENT_SECRET,
     scopes: ADOBE_SCOPES
-  },
-    {
-      autoRefresh: true
-    });
+  }, {
+    autoRefresh: true
+  });
 
   const config = {
     tokenProvider: authProvider,
@@ -264,238 +571,25 @@ async function main() {
   const firefly = new FireflyClient(config);
   const s3Client = new S3Client(AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY);
 
-  // Get all asset references (local files + S3 generated assets)
+  // Get all asset references
   const assetReferences = await getAssetReferences(assetsFolder, firefly, s3Client, brief);
-  logger.info(`Found ${assetReferences.length} asset reference(s)`, { 
-    assets: assetReferences.map(a => ({ filename: a.filename, type: a.type, category: a.category }))
-  });
+  logger.info(`Found ${assetReferences.length} asset reference(s)`);
 
-  // Calculate total expected outputs
-  let totalExpectedOutputs = 0;
-  for (const assetRef of assetReferences) {
-    const productCategoryConfig = brief.product_categories[assetRef.category];
-    if (productCategoryConfig) {
-      totalExpectedOutputs += productCategoryConfig.target_regions.length * brief.aspect_ratios.length;
-    }
-  }
-  results.summary.total = totalExpectedOutputs;
+  // Process all assets with hybrid approach
+  const results = await processAssetsHybrid(assetReferences, brief, firefly, photoshop, s3Client);
 
-  // Process each asset reference
-  for (const assetRef of assetReferences) {
-    logger.info("Starting image processing", { 
-      asset: assetRef.filename, 
-      type: assetRef.type, 
-      category: assetRef.category,
-      isGenerated: assetRef.isGenerated
-    });
-
-    // Get image buffer based on asset type
-    let baseBuffer;
-    let assetName;
-
-    try {
-      if (assetRef.type === 'local') {
-        // Handle local files
-        if (!fs.existsSync(assetRef.path)) {
-          throw new Error("Local image file not found");
-        }
-        baseBuffer = fs.readFileSync(assetRef.path);
-        assetName = path.basename(assetRef.path);
-      } else if (assetRef.type === 'generated') {
-        // Handle generated assets (no need to download, will use URL directly)
-        assetName = assetRef.filename;
-        baseBuffer = Buffer.alloc(0); // Empty buffer since we won't use it for generated assets
-      }
-
-      if (assetRef.type === 'local' && baseBuffer.length === 0) {
-        throw new Error("Empty image buffer");
-      }
-
-      logger.info("Image loaded", { 
-        filename: assetName, 
-        size: `${baseBuffer.length} bytes`,
-        type: assetRef.type,
-        isGenerated: assetRef.isGenerated
-      });
-
-    } catch (error) {
-      logger.error(`Skipping - Failed to load asset: ${assetRef.filename}`, error);
-      // Add to failures for loading errors
-      const productCategoryConfig = brief.product_categories[assetRef.category];
-      if (productCategoryConfig) {
-        for (const region of productCategoryConfig.target_regions) {
-          for (const ratio of brief.aspect_ratios) {
-            results.failures.push({
-              assetName: assetRef.filename,
-              productCategory: assetRef.category,
-              region: region.code,
-              aspectRatio: ratio,
-              error: `Failed to load asset: ${error.message}`,
-              timestamp: new Date().toISOString()
-            });
-            results.summary.failed++;
-          }
-        }
-      }
-      continue;
-    }
-
-    // Use the category from asset reference
-    const productCategory = assetRef.category;
-
-    // Get the product category's target regions
-    const productCategoryConfig = brief.product_categories[productCategory];
-
-    if (!productCategoryConfig) {
-      logger.error(`No configuration found for product category: ${productCategory}`, {
-        availableCategories: Object.keys(brief.product_categories)
-      });
-      continue;
-    }
-
-    for (const region of productCategoryConfig.target_regions) {
-      for (const ratio of brief.aspect_ratios) {
-        // Skip processing if this is a generated asset and it doesn't match the current ratio
-        if (assetRef.isGenerated && assetRef.aspectRatio !== ratio) {
-          continue;
-        }
-
-        const { width, height } = ratioToSize(ratio);
-        const imageName = path.basename(assetName, path.extname(assetName));
-        const label = `${imageName}_${region.code}_${ratio.replace(':', 'x')}`;
-
-        results.summary.processed++;
-
-        try {
-          let imageUrl;
-
-          if (assetRef.isGenerated) {
-            // For generated assets: Skip expand/mask/fill, use the generated image directly
-            logger.info("Processing generated asset - skipping expand/mask/fill", { 
-              label, 
-              targetSize: `${width}x${height}`,
-              sourceSize: `${assetRef.dimensions.width}x${assetRef.dimensions.height}`
-            });
-            imageUrl = assetRef.downloadUrl;
-          } else {
-            // For local assets: Use full processing pipeline
-            logger.info("Step 1: Expanding image", { label, targetSize: `${width}x${height}` });
-
-            //Step 1: Upload the base image to Firefly
-            const uploadResponse = await uploadImage(firefly, baseBuffer, assetName);
-            // Extract the actual response data
-            const uploadResult = uploadResponse.data || uploadResponse.result || uploadResponse;
-            const imageId = uploadResult.images[0].id;
-            logger.info("Upload completed", { imageId });
-
-            //Step 2: Expand the image to the desired size
-            const expandedImages = await expandImage(firefly, imageId, width, height, 1);
-            const expandedImageUrl = expandedImages.expandResults.outputs[0].image.url;
-            logger.info("Step 2: Image expanded", { label });
-
-            //Step 3: Create a mask of the expanded image
-            const invertMaskPresignedGetUrl = await createMask(s3Client, photoshop, expandedImageUrl, assetName, S3_BUCKET_NAME, S3_KEY_PREFIX + "/intermediate");
-            logger.info("Step 3: Mask created and inverted", { label });
-
-            //Step 4: Fill the image with the desired background
-            const fillImageResults = await fillImage(firefly, expandedImageUrl, invertMaskPresignedGetUrl, region.background_prompt, 1, region.locale);
-            imageUrl = fillImageResults.outputs[0].image.url;
-            logger.info("Step 4: Background filled", { label, prompt: region.background_prompt });
-          }
-
-          // Extract the actual filename without extension for use in the final filename (e.g., "Fragrance")
-          const baseFileName = path.basename(assetName, path.extname(assetName));
-          // Extract the base image extension (e.g., ".jpg")
-          const baseImageExtension = path.extname(assetName);
-
-          // Construct S3 key with organized folder structure
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const aspectRatioFormatted = ratio.replace(':', 'x');
-          // Use the actual base image format
-          const s3Key = `${S3_KEY_PREFIX}/${brief.id}/${productCategory}/${region.code}/${aspectRatioFormatted}/${baseFileName}_${region.code}_${aspectRatioFormatted}_${timestamp}${baseImageExtension}`;
-          const textLayerPutUrl = await s3Client.getPresignedPutUrl(S3_BUCKET_NAME, s3Key, 3600);
-
-          //Final Step: Add text overlay using Sharp
-          logger.info("Adding text overlay", {
-            label,
-            message: region.message,
-            dimensions: `${width}x${height}`,
-            isGenerated: assetRef.isGenerated
-          });
-
-          const imageFormat = getMimeType(baseImageExtension); // Use actual base image format
-          const textOverlayResponse = await addTextOverlay(imageUrl, textLayerPutUrl, region.message, imageFormat, baseImageExtension);
-          logger.info("Text overlay completed", {
-            label,
-            status: textOverlayResponse.status,
-            outputSize: textOverlayResponse.fontSize,
-            s3Key
-          });
-
-          // Generate presigned GET URL for the final result
-          const finalImageGetUrl = await s3Client.getPresignedGetUrl(S3_BUCKET_NAME, s3Key, 3600);
-
-          // Record success
-          results.success.push({
-            assetName: assetName,
-            productCategory,
-            region: region.code,
-            aspectRatio: ratio,
-            label,
-            s3Key,
-            presignedGetUrl: finalImageGetUrl,
-            dimensions: { width, height },
-            message: region.message,
-            assetType: assetRef.type,
-            isGenerated: assetRef.isGenerated,
-            processingSteps: assetRef.isGenerated ? ['text_overlay'] : ['upload', 'expand', 'mask', 'fill', 'text_overlay'],
-            timestamp: new Date().toISOString()
-          });
-          results.summary.succeeded++;
-
-        } catch (error) {
-          // Record failure
-          logger.error(`Failed to process ${label}`, error);
-          results.failures.push({
-            assetName: assetName,
-            productCategory,
-            region: region.code,
-            aspectRatio: ratio,
-            label,
-            error: error.message || error.toString(),
-            assetType: assetRef.type,
-            isGenerated: assetRef.isGenerated,
-            timestamp: new Date().toISOString()
-          });
-          results.summary.failed++;
-        }
-      }
-    }
-  }
+  const endTime = Date.now();
+  const executionTime = (endTime - startTime) / 1000;
 
   // Log final results
-  logger.info("Processing completed", {
+  logger.info("HYBRID Processing completed", {
     summary: results.summary,
+    executionTime: `${executionTime}s`,
     successCount: results.success.length,
     failureCount: results.failures.length
   });
 
-  // Log detailed results
-  if (results.success.length > 0) {
-    logger.info("Successful outputs", {
-      count: results.success.length,
-      results: results.success
-    });
-  }
-
-  if (results.failures.length > 0) {
-    logger.error("Failed outputs", {
-      count: results.failures.length,
-      failures: results.failures
-    });
-  }
-
-  // Write results to file with full timestamp
+  // Write results to file
   const now = new Date();
   const timestamp = now.getFullYear() + '-' + 
     String(now.getMonth() + 1).padStart(2, '0') + '-' + 
@@ -503,9 +597,9 @@ async function main() {
     String(now.getHours()).padStart(2, '0') + '-' +
     String(now.getMinutes()).padStart(2, '0') + '-' +
     String(now.getSeconds()).padStart(2, '0');
-  const resultsFile = `./results-${timestamp}.json`;
+  const resultsFile = `./results-hybrid-${timestamp}.json`;
   fs.writeFileSync(resultsFile, JSON.stringify(results, null, 2));
-  logger.info("Results saved to file", { resultsFile });
+  logger.info("Results saved to file", { resultsFile, executionTime: `${executionTime}s` });
 
   return results;
 }

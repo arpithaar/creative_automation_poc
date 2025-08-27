@@ -21,6 +21,9 @@ class Logger {
     
     // Set up log file paths
     this.setupLogFiles();
+    
+    // Add session separator
+    this.logSessionStart();
   }
 
   ensureLogDirectory() {
@@ -31,14 +34,13 @@ class Logger {
 
   setupLogFiles() {
     const now = new Date();
-    const timestamp = now.getFullYear() + '-' + 
+    const dateString = now.getFullYear() + '-' + 
       String(now.getMonth() + 1).padStart(2, '0') + '-' + 
-      String(now.getDate()).padStart(2, '0') + '_' +
-      String(now.getHours()).padStart(2, '0') + '-' +
-      String(now.getMinutes()).padStart(2, '0') + '-' +
-      String(now.getSeconds()).padStart(2, '0');
-    this.currentLogFile = path.join(this.logDir, `app-${timestamp}.log`);
-    this.currentErrorFile = path.join(this.logDir, `error-${timestamp}.log`);
+      String(now.getDate()).padStart(2, '0');
+    
+    // Use daily log files instead of per-run files
+    this.currentLogFile = path.join(this.logDir, `app-${dateString}.log`);
+    this.currentErrorFile = path.join(this.logDir, `error-${dateString}.log`);
   }
 
   rotateLogFile(filePath) {
@@ -131,7 +133,18 @@ class Logger {
     }
   }
 
-  // Removed specialized methods - using logger.info directly
+  logSessionStart() {
+    const timestamp = new Date().toISOString();
+    const separator = `\n${'='.repeat(80)}\n[${timestamp}] NEW SESSION STARTED\n${'='.repeat(80)}\n`;
+    
+    // Only append if files exist (to avoid creating empty separators)
+    if (fs.existsSync(this.currentLogFile)) {
+      fs.appendFileSync(this.currentLogFile, separator);
+    }
+    if (fs.existsSync(this.currentErrorFile)) {
+      fs.appendFileSync(this.currentErrorFile, separator);
+    }
+  }
 }
 
 // Create singleton instance

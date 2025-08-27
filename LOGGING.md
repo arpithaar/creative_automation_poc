@@ -81,12 +81,32 @@ logs/
 - `index.js` - Main application logging
 - `firefly-utils.js` - Utility function logging
 
+## Log Management Utility
+
+### Cleanup Tool
+Use the included `cleanup-logs.js` utility to manage log files:
+
+```bash
+# Show log status and options
+node cleanup-logs.js
+
+# Automatic cleanup (keep last 2 days)
+node cleanup-logs.js --auto
+
+# Clean only rotated files
+node cleanup-logs.js --rotated
+
+# Remove all logs (use with caution)
+node cleanup-logs.js --all
+```
+
 ## Benefits
 - ✅ Structured, timestamped logs
 - ✅ Configurable log levels
+- ✅ **Daily log files** (no more per-run clutter)
 - ✅ **File output with automatic rotation**
 - ✅ **Separate error logs for easy debugging**
-- ✅ **Size-based and time-based file management**
+- ✅ **Built-in cleanup utility**
 - ✅ Simple, consistent logging with logger.info
 - ✅ JSON formatting for easy parsing
 - ✅ No external dependencies
