@@ -11,13 +11,19 @@ The Creative Automation POC now tracks all processing results, including success
   "success": [...],
   "failures": [...],
   "summary": {
-    "total": 6,        // Total expected outputs
-    "processed": 6,    // Actual outputs processed
-    "succeeded": 4,    // Successfully generated
-    "failed": 2        // Failed to generate
+    "total": 18,       // Total expected outputs (6 per aspect ratio: 1:1, 9:16, 16:9)
+    "processed": 18,   // Actual outputs processed
+    "succeeded": 15,   // Successfully generated
+    "failed": 3        // Failed to generate
   }
 }
 ```
+
+### Aspect Ratio Processing
+The system generates assets for all configured aspect ratios using Firefly-supported dimensions:
+- **1:1** - Square format (2048x2048) for social media posts
+- **9:16** - Portrait format (1792x2304) for mobile stories and reels  
+- **16:9** - Landscape format (2688x1512) for web banners and presentations
 
 ### Success Entries
 Each successful image generation includes:
@@ -32,7 +38,30 @@ Each successful image generation includes:
   "presignedGetUrl": "https://acspocbucket.s3.us-east-1.amazonaws.com/...",
   "dimensions": { "width": 2048, "height": 2048 },
   "message": "Captivate Your Essence",
+  "assetType": "local",
+  "isGenerated": false,
+  "processingSteps": ["upload", "expand", "mask", "fill", "text_overlay"],
   "timestamp": "2025-08-27T10:30:15.123Z"
+}
+```
+
+### Generated Asset Entries
+AI-generated assets have additional fields:
+```json
+{
+  "assetName": "shoes_generated_1x1.jpg",
+  "productCategory": "shoes",
+  "region": "US",
+  "aspectRatio": "1:1", 
+  "label": "shoes_generated_US_1x1",
+  "s3Key": "aar/creative_automation_poc/bold_steps_signature_scents_2025/shoes/US/1x1/shoes_generated_US_1x1_2025-08-27T18-24-52-639Z.jpg",
+  "presignedGetUrl": "https://acspocbucket.s3.us-east-1.amazonaws.com/...",
+  "dimensions": { "width": 2048, "height": 2048 },
+  "message": "Step Into Your Power",
+  "assetType": "s3",
+  "isGenerated": true,
+  "processingSteps": ["text_overlay"],
+  "timestamp": "2025-08-27T18:24:52.639Z"
 }
 ```
 
@@ -46,6 +75,8 @@ Each failed processing includes:
   "aspectRatio": "1:1", 
   "label": "missing_image_US_1x1",
   "error": "Image file not found",
+  "assetType": "local",
+  "isGenerated": false,
   "timestamp": "2025-08-27T10:30:15.123Z"
 }
 ```
@@ -89,8 +120,10 @@ for (const success of results.success) {
 1. **"Image file not found"** - Source asset missing from assets folder
 2. **"Empty image file"** - Source asset exists but has 0 bytes
 3. **"No configuration found for product category"** - Category not defined in campaign.yaml
-4. **API errors** - Adobe Firefly/Photoshop API failures
-5. **S3 upload errors** - Network or permissions issues
+4. **"Failed to load asset"** - Error downloading generated asset from S3
+5. **API errors** - Adobe Firefly/Photoshop API failures
+6. **S3 upload errors** - Network or permissions issues
+7. **Asset generation failures** - AI generation errors for missing categories
 
 ### Debugging Failures
 - Check the `error` field in failure entries for specific error messages

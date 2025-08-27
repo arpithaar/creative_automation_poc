@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { StorageType, ImageFormatType } from "@adobe/photoshop-apis";
 import path from 'node:path';
 import sharp from 'sharp';
+import fetch from 'node-fetch';
 import logger from './logger.js';
 
 async function uploadImage(firefly, imageBuffer, filename) {
@@ -256,11 +257,47 @@ async function addTextOverlay(inputPresignedUrl, outputPresignedUrl, textContent
   }
 }
 
+// Generate image using Firefly V3 async API
+async function generateImage(firefly, prompt, width, height, numVariations = 1, locale = "en-US") {
+  try {
+    logger.info("generateImage: Starting image generation", { 
+      prompt: prompt.substring(0, 100) + "...", 
+      dimensions: `${width}x${height}`,
+      numVariations,
+      locale
+    });
+
+    const generateInput = {
+      prompt: prompt,
+      numVariations: numVariations,
+      size: {
+        width: width,
+        height: height
+      },
+      promptBiasingLocaleCode: locale,
+      seeds: [Math.floor(Math.random() * 1000000)] // Random seed for variation
+    };
+
+    const generateResult = await firefly.generateImages(generateInput);
+    logger.info("generateImage: Image generation completed", { 
+      status: generateResult.result?.status || 'unknown',
+      outputCount: generateResult.result?.outputs?.length || 0
+    });
+
+    return generateResult.result;
+
+  } catch (error) {
+    logger.error("generateImage: Error generating image", error);
+    throw error;
+  }
+}
+
 export {
   uploadImage,
   expandImage,
   createMask,
   fillImage,
   addTextOverlay,
-  getMimeType
+  getMimeType,
+  generateImage
 };

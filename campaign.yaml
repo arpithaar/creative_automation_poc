@@ -40,3 +40,10 @@ campaign:
           background_prompt: "vibrant Spanish plaza with traditional architecture and street art"
   aspect_ratios:
     - "1:1"
+    - "9:16"
+    - "16:9"
+  product_prompts:
+    fragrances: "A luxury perfume bottle with elegant design, crystal clear glass, golden cap, sitting on a white marble surface with soft studio lighting, premium product photography style, high quality, commercial photography"
+    shoes: "A premium athletic sneaker, modern design, clean white and accent colors, side view on white background, studio lighting, product photography style, high quality, commercial photography"
+    clothing: "A premium fashion item, modern style, clean design on white background, studio lighting, product photography style, high quality, commercial photography"
+    accessories: "A luxury accessory item, premium materials, elegant design on white background, studio lighting, product photography style, high quality, commercial photography"

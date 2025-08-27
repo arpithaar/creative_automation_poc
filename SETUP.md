@@ -13,7 +13,15 @@ Create a `.env` file with the following variables:
 # Get these from Adobe Developer Console (https://developer.adobe.com/console)
 ADOBE_CLIENT_ID=your_adobe_client_id_here
 ADOBE_CLIENT_SECRET=your_adobe_client_secret_here
-ADOBE_SCOPES=openid,creative_sdk,firefly_api,ff_apis
+ADOBE_SCOPES=openid,AdobeID,firefly_api,ff_apis
+
+# AWS S3 Configuration (Required)
+# Used for storing generated assets and intermediate files
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_aws_access_key_id
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+S3_BUCKET_NAME=your_s3_bucket_name
+S3_KEY_PREFIX=creative_automation_poc
 
 # Photoshop API URLs (optional - for PSD text processing)
 INPUT_PSD_GET_URL=https://your-storage.com/path/to/template.psd
@@ -29,6 +37,25 @@ OUTPUT_PSD_PUT_URL=https://your-storage.com/path/to/output.psd
 5. Copy the following values to your `.env` file:
    - **Client ID** → `ADOBE_CLIENT_ID`
    - **Client Secret** → `ADOBE_CLIENT_SECRET`
+
+## Getting AWS S3 Credentials
+
+1. Go to [AWS Console](https://console.aws.amazon.com/)
+2. Create an IAM user with S3 permissions
+3. Generate Access Keys for the user
+4. Create an S3 bucket for storing assets
+5. Copy the following values to your `.env` file:
+   - **Access Key ID** → `AWS_ACCESS_KEY_ID`
+   - **Secret Access Key** → `AWS_SECRET_ACCESS_KEY`
+   - **Bucket Name** → `S3_BUCKET_NAME`
+   - **Region** → `AWS_REGION`
+
+### Required S3 Permissions
+The IAM user needs the following permissions on your S3 bucket:
+- `s3:GetObject`
+- `s3:PutObject`
+- `s3:DeleteObject`
+- `s3:ListBucket`
 
 ## What Changed
 
