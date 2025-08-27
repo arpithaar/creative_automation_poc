@@ -49,14 +49,14 @@ Create `.env` file:
 # Adobe Firefly API
 ADOBE_CLIENT_ID=your_client_id
 ADOBE_CLIENT_SECRET=your_client_secret
-ADOBE_SCOPES=openid,AdobeID,firefly_api,ff_apis
+ADOBE_SCOPES=openid,AdobeID,session,additional_info,read_organizations,firefly_api,ff_apis
 
 # AWS S3
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
 S3_BUCKET_NAME=your_bucket_name
-S3_KEY_PREFIX=creative_automation_poc
+S3_KEY_PREFIX={ldap}/creative_automation_poc
 ```
 
 ### Campaign Configuration
