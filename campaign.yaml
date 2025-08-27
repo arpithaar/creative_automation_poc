@@ -1,0 +1,42 @@
+
+campaign:
+  name: "Bold Steps, Signature Scents"
+  id: "bold_steps_signature_scents_2025"
+  assets_folder: "./assets/products"
+  product_categories:
+    fragrances:
+      target_regions:
+        - code: "US"
+          locale: "en-US"
+          audience: "luxury fragrance enthusiasts"
+          message: "Captivate Your Essence"
+          background_prompt: "elegant modern perfumery with soft lighting and marble surfaces"
+        - code: "DE"
+          locale: "de-DE"
+          audience: "sophisticated scent connoisseurs"
+          message: "Entdecke Deine Einzigartigkeit"
+          background_prompt: "luxurious European boutique with refined decor and premium displays"
+        - code: "ES"
+          locale: "es-ES"
+          audience: "passionate fragrance lovers"
+          message: "Despierta Tus Sentidos"
+          background_prompt: "elegant Spanish perfumery with warm lighting and artisanal details"
+    shoes:
+      target_regions:
+        - code: "US"
+          locale: "en-US"
+          audience: "active lifestyle enthusiasts"
+          message: "Step Into Your Power"
+          background_prompt: "urban street basketball court with vibrant city skyline"
+        - code: "DE"
+          locale: "de-DE"
+          audience: "fashion-forward athletes"
+          message: "Mutige Schritte, Starker Look"
+          background_prompt: "modern European city square with cobblestone streets and stylish architecture"
+        - code: "ES"
+          locale: "es-ES"
+          audience: "passionate football fans"
+          message: "Pasos Audaces, Looks Brillantes"
+          background_prompt: "vibrant Spanish plaza with traditional architecture and street art"
+  aspect_ratios:
+    - "1:1"

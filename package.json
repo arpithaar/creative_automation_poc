@@ -1,0 +1,21 @@
+{
+  "name": "creative_automative_poc",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@adobe/aio-sdk": "^4.0.0",
+    "@adobe/firefly-apis": "^2.0.0",
+    "@adobe/firefly-services-common-apis": "^2.0.0",
+    "@adobe/photoshop-apis": "^2.0.0",
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/s3-request-presigner": "^3.0.0",
+    "dotenv": "^16.4.5",
+    "node-fetch": "^3.3.2",
+    "sharp": "^0.34.3",
+    "uuid": "^9.0.0",
+    "yaml": "^2.3.4"
+  }
+}
