@@ -64,27 +64,48 @@ S3_KEY_PREFIX={ldap}/creative_automation_poc
 Edit `campaign.yaml`:
 ```yaml
 campaign:
-  id: "creative_automative_poc_2025"
-  name: "Bold Steps, Signature Scents"
+  name: "Bold Steps, Signature Scents 2025"
+  id: "bold_steps_signature_scents_2025"
   assets_folder: "./assets/products"
-  aspect_ratios: ["1:1", "9:16", "16:9"]
-  
   product_categories:
     fragrances:
       target_regions:
         - code: "US"
           locale: "en-US"
-          audience: "young professionals"
+          audience: "luxury fragrance enthusiasts"
           message: "Captivate Your Essence"
-          background_prompt: "elegant modern perfumery"
+          background_prompt: "elegant modern perfumery with soft lighting and marble surfaces"
+        - code: "DE"
+          locale: "de-DE"
+          audience: "sophisticated scent connoisseurs"
+          message: "Entdecke Deine Einzigartigkeit"
+          background_prompt: "luxurious European boutique with refined decor and premium displays"
+        - code: "ES"
+          locale: "es-ES"
+          audience: "passionate fragrance lovers"
+          message: "Despierta Tus Sentidos"
+          background_prompt: "elegant Spanish perfumery with warm lighting and artisanal details"
     shoes:
       target_regions:
         - code: "US"
           locale: "en-US"
           audience: "active lifestyle enthusiasts"
-          message: "Step Into Confidence"
-          background_prompt: "urban streetwear environment"
-          
+          message: "Step Into Your Power"
+          background_prompt: "urban street basketball court with vibrant city skyline"
+        - code: "DE"
+          locale: "de-DE"
+          audience: "fashion-forward athletes"
+          message: "Mutige Schritte, Starker Look"
+          background_prompt: "modern European city square with cobblestone streets and stylish architecture"
+        - code: "ES"
+          locale: "es-ES"
+          audience: "passionate football fans"
+          message: "Pasos Audaces, Looks Brillantes"
+          background_prompt: "vibrant Spanish plaza with traditional architecture and street art"
+  aspect_ratios:
+    - "1:1"
+    - "9:16"
+    - "16:9"
   product_prompts:
     fragrances: "A luxury perfume bottle with elegant design, crystal clear glass, golden cap, sitting on a white marble surface with soft studio lighting, premium product photography style, high quality, commercial photography"
     shoes: "A premium athletic sneaker, modern design, clean white and accent colors, side view on white background, studio lighting, product photography style, high quality, commercial photography"
