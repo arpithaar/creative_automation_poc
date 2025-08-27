@@ -163,7 +163,7 @@ s3://bucket/creative_automation_poc/
 - **Generated Assets**: AI-created images for missing categories
   - Generated at Firefly-optimized dimensions for each aspect ratio
   - Only processed for their specific aspect ratio to maintain quality
-  - Skip expand/mask/fill pipeline for efficiency
+  - Skip expand/mask/fill pipeline for efficiency by performing text overlay only
 
 ## Architecture & Workflow
 
