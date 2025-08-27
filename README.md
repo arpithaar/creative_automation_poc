@@ -137,7 +137,7 @@ s3://bucket/creative_automation_poc/
 
 ### System Design Overview
 
-> **Note**: If the Mermaid diagrams below don't render in your Markdown preview, the visual diagrams are available in the development environment.
+> **Note**: If the Mermaid diagrams below don't render in your Markdown viewer, they will display properly on GitHub, GitLab, VS Code with Mermaid extensions, or other Mermaid-compatible viewers.
 
 ```mermaid
 graph TB
@@ -146,7 +146,7 @@ graph TB
         B[Campaign Config<br/>campaign.yaml]
     end
     
-    subgraph "Asset Discovery & Generation"
+    subgraph "Discovery & Generation"
         C[Scan Local Assets]
         D[Identify Missing Categories]
         E[Generate Missing Assets<br/>Adobe Firefly API]
@@ -192,15 +192,6 @@ graph TB
     H1 --> I
     I --> J
     J --> K
-    
-    style E fill:#e1f5fe
-    style G2 fill:#e1f5fe
-    style G3 fill:#f3e5f5
-    style G4 fill:#e1f5fe
-    style G5 fill:#e8f5e8
-    style H1 fill:#e8f5e8
-    style I fill:#fff3e0
-    style J fill:#fff3e0
 ```
 
 ### API Integration Details
